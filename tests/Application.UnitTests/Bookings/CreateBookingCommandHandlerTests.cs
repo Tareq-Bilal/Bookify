@@ -12,6 +12,7 @@ namespace Application.UnitTests.Bookings;
 public sealed class CreateBookingCommandHandlerTests : BaseHandlerTest
 {
     private static readonly Guid UserId = Guid.NewGuid();
+    private static readonly Guid OtherUserId = Guid.NewGuid();
     private static readonly DateTimeOffset StartDateTime = new(2026, 7, 2, 10, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset EndDateTime = new(2026, 7, 2, 11, 0, 0, TimeSpan.Zero);
 
@@ -73,12 +74,16 @@ public sealed class CreateBookingCommandHandlerTests : BaseHandlerTest
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnConflict_WhenBookingOverlapsConfirmedBooking()
+    public async Task Handle_Should_ReturnConflict_WhenUserHasOverlappingConfirmedBooking()
     {
         // Arrange
         await using TestDbContext context = CreateDbContext();
         await AddUserAsync(context);
-        context.Bookings.Add(CreateBooking(StartDateTime.UtcDateTime, EndDateTime.UtcDateTime, BookingStatus.Confirmed));
+        context.Bookings.Add(CreateBooking(
+            StartDateTime.UtcDateTime,
+            EndDateTime.UtcDateTime,
+            BookingStatus.Confirmed,
+            "room-b"));
         await context.SaveChangesAsync();
         CreateBookingCommand command = CreateOverlappingCommand();
         IUserContext userContext = Substitute.For<IUserContext>();
@@ -93,7 +98,42 @@ public sealed class CreateBookingCommandHandlerTests : BaseHandlerTest
 
         // Assert
         result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldBe(BookingErrors.OverlapsExistingBooking("room-a"));
+        result.Error.ShouldBe(BookingErrors.OverlapsExistingUserBooking(
+            "room-b",
+            StartDateTime.UtcDateTime,
+            EndDateTime.UtcDateTime));
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnConflict_WhenResourceHasOverlappingConfirmedBooking()
+    {
+        // Arrange
+        await using TestDbContext context = CreateDbContext();
+        await AddUserAsync(context);
+        context.Bookings.Add(CreateBooking(
+            StartDateTime.UtcDateTime,
+            EndDateTime.UtcDateTime,
+            BookingStatus.Confirmed,
+            "room-a",
+            OtherUserId));
+        await context.SaveChangesAsync();
+        CreateBookingCommand command = CreateOverlappingCommand();
+        IUserContext userContext = Substitute.For<IUserContext>();
+        userContext.UserId.Returns(UserId);
+        IDateTimeProvider dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        IBookingConflictDetector bookingConflictDetector = Substitute.For<IBookingConflictDetector>();
+
+        var handler = new CreateBookingCommandHandler(context, dateTimeProvider, userContext, bookingConflictDetector);
+
+        // Act
+        Result<Guid> result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(BookingErrors.OverlapsExistingBooking(
+            "room-a",
+            StartDateTime.UtcDateTime,
+            EndDateTime.UtcDateTime));
     }
 
     [Fact]
@@ -158,12 +198,17 @@ public sealed class CreateBookingCommandHandlerTests : BaseHandlerTest
         await context.SaveChangesAsync();
     }
 
-    private static Booking CreateBooking(DateTime startDateTime, DateTime endDateTime, BookingStatus status) =>
+    private static Booking CreateBooking(
+        DateTime startDateTime,
+        DateTime endDateTime,
+        BookingStatus status,
+        string resourceId = "room-a",
+        Guid? userId = null) =>
         new()
         {
             Id = Guid.NewGuid(),
-            ResourceId = "room-a",
-            UserId = UserId,
+            ResourceId = resourceId,
+            UserId = userId ?? UserId,
             StartDateTime = startDateTime,
             EndDateTime = endDateTime,
             Status = status,

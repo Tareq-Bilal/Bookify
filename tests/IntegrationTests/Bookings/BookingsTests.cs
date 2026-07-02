@@ -111,6 +111,29 @@ public sealed class BookingsTests(IntegrationTestWebAppFactory factory) : BaseIn
     }
 
     [Fact]
+    public async Task CreateBooking_Should_ReturnConflict_WhenCurrentUserHasOverlappingBookingOnDifferentResource()
+    {
+        // Arrange
+        (Guid userId, AccessTokens tokens) = await RegisterAndLoginAsync();
+        Authenticate(tokens.AccessToken);
+        DateTimeOffset startDateTime = new(2026, 7, 2, 10, 0, 0, TimeSpan.Zero);
+        DateTimeOffset endDateTime = new(2026, 7, 2, 11, 0, 0, TimeSpan.Zero);
+
+        HttpResponseMessage firstCreateResponse = await HttpClient.PostAsJsonAsync(
+            "bookings",
+            CreateRequest($"room-a-{Guid.NewGuid():N}", userId, startDateTime, endDateTime));
+        firstCreateResponse.EnsureSuccessStatusCode();
+
+        // Act
+        HttpResponseMessage secondCreateResponse = await HttpClient.PostAsJsonAsync(
+            "bookings",
+            CreateRequest($"room-b-{Guid.NewGuid():N}", userId, startDateTime.AddMinutes(30), endDateTime.AddMinutes(30)));
+
+        // Assert
+        secondCreateResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
     public async Task CreateBooking_Should_ReturnOneConflict_WhenTwoRequestsBookSameSlotConcurrently()
     {
         // Arrange
