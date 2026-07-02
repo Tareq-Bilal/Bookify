@@ -1,4 +1,5 @@
-﻿using Application.Abstractions.Data;
+using Application.Abstractions.Data;
+using Domain.Bookings;
 using Domain.Todos;
 using Domain.Users;
 using Infrastructure.DomainEvents;
@@ -17,6 +18,8 @@ public sealed class ApplicationDbContext(
     public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public DbSet<TodoItem> TodoItems { get; set; }
+
+    public DbSet<Booking> Bookings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
