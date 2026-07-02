@@ -6,6 +6,17 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddPresentation(this IServiceCollection services)
     {
+        services.AddCors(options =>
+        {
+            options.AddPolicy("Frontend", policy =>
+            {
+                policy
+                    .WithOrigins("http://localhost:5173")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+        });
+
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
 

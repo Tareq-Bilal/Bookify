@@ -46,6 +46,8 @@ app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
 
+app.UseCors("Frontend");
+
 app.UseAuthentication();
 
 app.UseAuthorization();
