@@ -1,63 +1,108 @@
-# Clean Architecture Template
+# Bookify Booking Management Service
 
-A pragmatic Clean Architecture starter for **.NET 10**. Batteries included, opinionated where it matters, and easy to extend.
+Bookify is a .NET 10 Web API built with a pragmatic Clean Architecture style. This implementation adds a Booking Management Service for shared resources, plus a small Vite React frontend that exercises the API end to end.
 
-## What's included in the template?
+## Running Locally
 
-- **SharedKernel** project with common Domain-Driven Design abstractions.
-- **Domain** layer with sample entities and domain events.
-- **Application** layer with abstractions for:
-  - CQRS (lightweight, MediatR-free command/query handlers)
-  - Example use cases (Todos and Users)
-  - Cross-cutting concerns (logging, validation) implemented as decorators
-- **Infrastructure** layer with:
-  - JWT authentication with **refresh tokens** (with token rotation)
-  - Permission-based authorization
-  - EF Core + PostgreSQL (snake_case naming, migrations)
-  - **HybridCache** for fast, unified caching with cache invalidation
-  - Serilog structured logging
-- **Web.Api** layer with:
-  - Minimal API endpoints
-  - **Rate limiting** (configurable global + authentication policies)
-  - **OpenTelemetry** tracing and metrics (ASP.NET Core, HTTP, Npgsql, runtime)
-  - Global exception handling and `ProblemDetails`
-  - Swagger / OpenAPI with JWT support
-- **Seq** for searching and analyzing structured logs
-  - Seq is available at http://localhost:8081 by default
-- **Testing** projects
-  - Architecture testing (`ArchitectureTests`)
-  - Unit testing (`Application.UnitTests`)
-  - Integration testing with **Testcontainers** (`IntegrationTests`)
+Start PostgreSQL and Seq:
 
-## Getting started
-
-```bash
-docker compose up -d        # PostgreSQL + Seq
-dotnet run --project src/Web.Api
+```powershell
+docker compose up -d postgres seq
 ```
 
-Run the full test suite (the integration tests spin up a throwaway PostgreSQL container, so
-Docker must be running):
+Run the API:
 
-```bash
-dotnet test CleanArchitecture.slnx
+```powershell
+dotnet run --project src/Web.Api/Web.Api.csproj --launch-profile http
 ```
 
-To target .NET 8 or .NET 9 instead of .NET 10, see the notes in `Directory.Build.props`.
+Open Swagger:
 
-I'm open to hearing your feedback about the template and what you'd like to see in future iterations.
+```text
+http://localhost:5000/swagger
+```
 
-If you're ready to learn more, check out [**Pragmatic Clean Architecture**](https://www.milanjovanovic.tech/pragmatic-clean-architecture?utm_source=ca-template):
+Run the frontend:
 
-- Domain-Driven Design
-- Role-based authorization
-- Permission-based authorization
-- Distributed caching with Redis
-- OpenTelemetry
-- Outbox pattern
-- API Versioning
-- Unit testing
-- Functional testing
-- Integration testing
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-Stay awesome!
+The frontend uses `VITE_API_BASE_URL` and defaults to `http://localhost:5000`.
+
+## API Summary
+
+Authentication uses the existing JWT flow:
+
+- `POST users/register`
+- `POST users/login`
+- `POST users/id`
+
+Booking endpoints require a bearer token:
+
+- `POST /bookings`
+  - Body: `{ resourceId, userId, startDateTime, endDateTime }`
+  - Returns the booking id.
+- `GET /bookings?resourceId=room-a&fromDateTime=...&toDateTime=...&page=1&pageSize=50&includeCancelled=false`
+  - Returns `{ items, page, pageSize, totalCount }`.
+- `PUT /bookings/{bookingId}/cancel`
+  - Soft-cancels the booking.
+
+Dates may be sent as ISO-8601 values with `Z` or an offset. The API normalizes them to UTC before persistence.
+
+## Design Decisions
+
+Bookings are modeled as a new domain feature beside Users and Todos. A booking has a `ResourceId`, `UserId`, UTC `StartDateTime`, UTC `EndDateTime`, `Status`, and audit timestamps for creation/cancellation. Cancellation is a soft delete: cancelled rows remain queryable when requested, but they no longer block future bookings.
+
+Overlap is defined with half-open intervals: `[StartDateTime, EndDateTime)`. Two confirmed bookings overlap when:
+
+```text
+existing.StartDateTime < requested.EndDateTime
+AND requested.StartDateTime < existing.EndDateTime
+```
+
+This means a booking that ends exactly when another begins is allowed. It is a common scheduling convention because it avoids artificial gaps between adjacent reservations.
+
+The application handler performs a friendly pre-check so normal conflicts return a clear `409 Conflict`. The database also enforces correctness with a PostgreSQL exclusion constraint over `resource_id` and `tstzrange(start_date_time, end_date_time, '[)')`, filtered to confirmed bookings. That protects the race where two requests pass the pre-check at the same time.
+
+## Extension: Concurrency
+
+I chose the concurrency extension because preventing double-booking is the core risk in this problem. The race is:
+
+1. Request A checks that the slot is free.
+2. Request B checks the same slot before A commits.
+3. Both insert, unless the database rejects one.
+
+The PostgreSQL exclusion constraint is the final guard. The application catches that persistence conflict and maps it back to the same booking overlap domain error. This prioritizes correctness while keeping the application code simple.
+
+The tradeoff is PostgreSQL specificity. A different database would need a different guard, such as serializable transactions, locks, or an equivalent range constraint.
+
+## Scale And Evolution
+
+The first bottleneck would likely be hot resources with many bookings in the same date ranges. The current indexes support resource/date-range reads, but a heavily booked resource can still create contention around the exclusion constraint.
+
+To evolve this into a distributed system, bookings should be owned by a booking service with resource-based partitioning, idempotency keys for create requests, and an outbox/event stream for downstream consumers. Query-heavy views could move to read models optimized for calendar display or availability search.
+
+The implementation prioritizes correctness first, then simplicity. Performance is kept reasonable through indexes and bounded paging, but the design avoids premature caching or distributed coordination.
+
+## Tests
+
+Run backend checks:
+
+```powershell
+dotnet build src/Web.Api/Web.Api.csproj
+dotnet test tests/Application.UnitTests/Application.UnitTests.csproj
+dotnet test tests/IntegrationTests/IntegrationTests.csproj
+```
+
+Run frontend build:
+
+```powershell
+cd frontend
+npm install
+npm run build
+```
+
+Integration tests use Testcontainers PostgreSQL, so Docker must be running.
