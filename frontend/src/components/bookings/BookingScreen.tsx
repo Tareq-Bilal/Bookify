@@ -1,13 +1,32 @@
 import { CalendarClock, Search, ShieldCheck } from "lucide-react";
-import { useState } from "react";
-import { Booking, cancelBooking, getBookingsByResource, getCurrentUserBookings } from "../../api";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Booking,
+  cancelBooking,
+  getBookingsByResource,
+  getCurrentUserBookings,
+} from "../../api";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { Session } from "../../hooks/useSession";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { formatDateTime } from "../../utils/dates";
 import { Badge } from "../ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { ConfirmDialog } from "../ui/confirm-dialog";
+import { ToastItem, ToastViewport } from "../ui/toast";
 import { AppHeader } from "../layout/AppHeader";
-import { BookingFilters, BookingSearchParams } from "./BookingFilters";
+import {
+  BookingFilters,
+  BookingSearchParams,
+  BookingSortBy,
+  BookingSortDirection,
+  createDefaultBookingSearchParams,
+} from "./BookingFilters";
 import { BookingForm } from "./BookingForm";
 import { BookingsTable } from "./BookingsTable";
 
@@ -19,8 +38,10 @@ type BookingScreenProps = {
 export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [lastSearch, setLastSearch] = useState<BookingSearchParams | null>(null);
-  const { isBusy, message, run } = useAsyncAction();
+  const [lastSearch, setLastSearch] = useState<BookingSearchParams>(() => createDefaultBookingSearchParams());
+  const [pendingCancel, setPendingCancel] = useState<Booking | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const { isBusy, message, status, run } = useAsyncAction();
 
   async function loadBookings(params: BookingSearchParams) {
     setLastSearch(params);
@@ -31,96 +52,232 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
             session.accessToken,
             params.fromDateTime,
             params.toDateTime,
-            params.includeCancelled
+            params.includeCancelled,
           )
         : await getBookingsByResource(
             session.accessToken,
             params.resourceId,
             params.fromDateTime,
             params.toDateTime,
-            params.includeCancelled
+            params.includeCancelled,
           );
 
     setBookings(page.items);
     setTotalCount(page.totalCount);
   }
 
-  async function refreshLastSearch() {
-    if (lastSearch) {
-      await loadBookings(lastSearch);
+  useEffect(() => {
+    run(async () => {
+      await loadBookings(createDefaultBookingSearchParams());
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!message || !status) {
+      return;
     }
+
+    pushToast(status === "success" ? "success" : "error", status === "success" ? "Success" : "Action failed", message);
+  }, [message, status]);
+
+  async function refreshLastSearch() {
+    await loadBookings(lastSearch);
   }
 
-  function handleCancel(bookingId: string) {
+  function handleCancel(booking: Booking) {
+    setPendingCancel(booking);
+  }
+
+  function confirmCancel() {
+    if (!pendingCancel) {
+      return;
+    }
+
+    const bookingId = pendingCancel.id;
+
     run(async () => {
       await cancelBooking(session.accessToken, bookingId);
+      setPendingCancel(null);
       await refreshLastSearch();
 
       return "Booking cancelled.";
     });
   }
 
+  function dismissToast(id: string) {
+    setToasts(current => current.filter(toast => toast.id !== id));
+  }
+
+  function pushToast(variant: ToastItem["variant"], title: string, description: string) {
+    const id = `${Date.now()}-${Math.random()}`;
+
+    setToasts(current => [...current.slice(-2), { id, title, description, variant }]);
+    window.setTimeout(() => dismissToast(id), 5000);
+  }
+
+  const sortedBookings = useMemo(
+    () => sortBookings(bookings, lastSearch.sortBy, lastSearch.sortDirection),
+    [bookings, lastSearch.sortBy, lastSearch.sortDirection],
+  );
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <AppHeader onSignOut={onSignOut} session={session} />
       <section className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-          <Card className="border-slate-200 bg-slate-950 text-white shadow-panel">
-            <CardHeader className="space-y-4">
-              <Badge className="w-fit bg-white/10 text-white hover:bg-white/10" variant="outline">
-                Booking workspace
-              </Badge>
-              <div className="max-w-3xl space-y-3">
-                <CardTitle className="text-3xl font-bold sm:text-4xl">Manage shared resource reservations</CardTitle>
-                <CardDescription className="text-base leading-7 text-slate-300">
-                  Create bookings, review your own reservations across resources, and inspect resource availability in
-                  one focused dashboard.
-                </CardDescription>
-              </div>
-            </CardHeader>
-          </Card>
+        <Card className="border-slate-200 bg-slate-950 text-white shadow-panel">
+          <CardHeader className="space-y-4">
+            <Badge
+              className="w-fit bg-white/10 text-white hover:bg-white/10"
+              variant="outline"
+            >
+              Booking workspace
+            </Badge>
+            <div className="max-w-3xl space-y-3">
+              <CardTitle className="text-3xl font-bold sm:text-4xl">
+                Manage shared resource reservations
+              </CardTitle>
+              <CardDescription className="text-base leading-7 text-slate-300">
+                Create bookings, review your own reservations across resources,
+                and inspect resource availability in one focused dashboard.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <MetricCard
+              icon={<ShieldCheck size={18} />}
+              label="Default view"
+              value="My bookings"
+            />
+            <MetricCard
+              icon={<CalendarClock size={18} />}
+              label="Loaded"
+              value={`${totalCount} records`}
+            />
+            <MetricCard
+              icon={<Search size={18} />}
+              label="Sorted by"
+              value={sortLabel(lastSearch.sortBy, lastSearch.sortDirection)}
+            />
+          </CardContent>
+        </Card>
 
-          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-            <MetricCard icon={<ShieldCheck size={18} />} label="Access" value="JWT guarded" />
-            <MetricCard icon={<CalendarClock size={18} />} label="Rule" value="[start, end)" />
-            <MetricCard icon={<Search size={18} />} label="Search" value="Mine or resource" />
-          </div>
+        <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+          <BookingForm onCreated={refreshLastSearch} onNotify={pushToast} session={session} />
+          <BookingFilters
+            isBusy={isBusy}
+            onSearch={(params) => run(() => loadBookings(params))}
+          />
         </div>
-
-        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <BookingForm onCreated={refreshLastSearch} session={session} />
-          <BookingFilters isBusy={isBusy} onSearch={params => run(() => loadBookings(params))} />
-        </div>
-
-        {message ? (
-          <Alert variant="warning">
-            <AlertTitle>Workspace update</AlertTitle>
-            <AlertDescription>{message}</AlertDescription>
-          </Alert>
-        ) : null}
 
         <BookingsTable
-          bookings={bookings}
+          bookings={sortedBookings}
           currentUserId={session.userId}
           isBusy={isBusy}
           onCancel={handleCancel}
           totalCount={totalCount}
         />
       </section>
+
+      <ConfirmDialog
+        description={
+          pendingCancel ? (
+            <>
+              This will cancel {pendingCancel.resourceId} from{" "}
+              <span className="font-semibold text-slate-950">
+                {formatDateTime(pendingCancel.startDateTime)}
+              </span>{" "}
+              to{" "}
+              <span className="font-semibold text-slate-950">
+                {formatDateTime(pendingCancel.endDateTime)}
+              </span>
+              .
+            </>
+          ) : null
+        }
+        isBusy={isBusy}
+        onCancel={() => setPendingCancel(null)}
+        onConfirm={confirmCancel}
+        open={pendingCancel !== null}
+        title="Cancel this booking?"
+      />
+      <ToastViewport onDismiss={dismissToast} toasts={toasts} />
     </main>
   );
 }
 
-function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function sortBookings(bookings: Booking[], sortBy: BookingSortBy, direction: BookingSortDirection) {
+  const multiplier = direction === "asc" ? 1 : -1;
+
+  return [...bookings].sort((first, second) => {
+    const firstValue = getSortValue(first, sortBy);
+    const secondValue = getSortValue(second, sortBy);
+    const result =
+      typeof firstValue === "number" && typeof secondValue === "number"
+        ? firstValue - secondValue
+        : String(firstValue).localeCompare(String(secondValue));
+
+    if (result !== 0) {
+      return result * multiplier;
+    }
+
+    return first.id.localeCompare(second.id);
+  });
+}
+
+function getSortValue(booking: Booking, sortBy: BookingSortBy): number | string {
+  switch (sortBy) {
+    case "startDateTime":
+    case "endDateTime":
+    case "createdAt":
+      return new Date(booking[sortBy]).getTime();
+    case "resourceId":
+      return booking.resourceId.toLowerCase();
+    case "status":
+      return String(booking.status);
+  }
+}
+
+function sortLabel(sortBy: BookingSortBy, direction: BookingSortDirection) {
+  const labels: Record<BookingSortBy, string> = {
+    startDateTime: "start time",
+    endDateTime: "end time",
+    resourceId: "resource",
+    status: "status",
+    createdAt: "created time"
+  };
+
+  const isDateSort = sortBy === "startDateTime" || sortBy === "endDateTime" || sortBy === "createdAt";
+  const directionLabel = isDateSort
+    ? direction === "asc"
+      ? "oldest first"
+      : "newest first"
+    : direction === "asc"
+      ? "A-Z"
+      : "Z-A";
+
+  return `${labels[sortBy]}, ${directionLabel}`;
+}
+
+function MetricCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
   return (
-    <Card className="border-slate-200 bg-white/95 shadow-sm">
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex size-10 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">{icon}</div>
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-          <p className="truncate font-semibold text-slate-950">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-3 rounded-md border border-white/10 bg-white/10 p-4">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-white/15 text-white">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase text-slate-300">
+          {label}
+        </p>
+        <p className="truncate font-semibold text-white">{value}</p>
+      </div>
+    </div>
   );
 }

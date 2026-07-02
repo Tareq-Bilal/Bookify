@@ -16,19 +16,23 @@ export function AppHeader({ session, onSignOut }: AppHeaderProps) {
             <CalendarDays size={21} />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Bookify</p>
-            <h1 className="text-xl font-bold text-slate-950 sm:text-2xl">Booking Management</h1>
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+              Bookify
+            </p>
+            <h1 className="text-xl font-bold text-slate-950 sm:text-2xl">
+              Booking Management
+            </h1>
           </div>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-            <span className="font-semibold text-slate-900">{session.email}</span>
+            <span className="font-semibold text-slate-900">
+              {session.email}
+            </span>
             <span className="mx-2 text-slate-300">/</span>
             <span>{session.userId.slice(0, 8)}</span>
           </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-            {apiBaseUrl}
-          </div>
+
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             onClick={onSignOut}

@@ -12,7 +12,7 @@ type BookingsTableProps = {
   currentUserId: string;
   isBusy: boolean;
   totalCount: number;
-  onCancel: (bookingId: string) => void;
+  onCancel: (booking: Booking) => void;
 };
 
 export function BookingsTable({ bookings, currentUserId, isBusy, totalCount, onCancel }: BookingsTableProps) {
@@ -60,7 +60,7 @@ export function BookingsTable({ bookings, currentUserId, isBusy, totalCount, onC
                       <Button
                         aria-label="Cancel booking"
                         disabled={isBusy}
-                        onClick={() => onCancel(booking.id)}
+                        onClick={() => onCancel(booking)}
                         size="icon"
                         title="Cancel booking"
                         type="button"
