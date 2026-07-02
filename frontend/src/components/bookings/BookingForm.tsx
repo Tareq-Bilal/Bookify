@@ -3,6 +3,11 @@ import { FormEvent, useState } from "react";
 import { createBooking } from "../../api";
 import { Session } from "../../hooks/useSession";
 import { defaultBookingEnd, defaultBookingStart } from "../../utils/dates";
+import { Alert, AlertDescription } from "../ui/alert";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 
 type BookingFormProps = {
   session: Session;
@@ -33,57 +38,58 @@ export function BookingForm({ session, onCreated }: BookingFormProps) {
   }
 
   return (
-    <form className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" onSubmit={handleSubmit}>
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
-          <CalendarPlus size={19} />
+    <Card className="border-slate-200 shadow-panel">
+      <CardHeader className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">
+            <CalendarPlus size={18} />
+          </div>
+          <div>
+            <CardTitle>Create Booking</CardTitle>
+            <CardDescription>Reserve a resource for the signed-in user.</CardDescription>
+          </div>
         </div>
-        <div>
-          <h2 className="text-lg font-bold text-slate-950">Create booking</h2>
-          <p className="text-sm text-slate-500">Reserve one resource for your signed-in user.</p>
-        </div>
-      </div>
+      </CardHeader>
+      <CardContent>
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="resourceId">Resource</Label>
+              <Input id="resourceId" onChange={event => setResourceId(event.target.value)} value={resourceId} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="startDateTime">Start</Label>
+              <Input
+                id="startDateTime"
+                onChange={event => setStartDateTime(event.target.value)}
+                type="datetime-local"
+                value={startDateTime}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endDateTime">End</Label>
+              <Input
+                id="endDateTime"
+                onChange={event => setEndDateTime(event.target.value)}
+                type="datetime-local"
+                value={endDateTime}
+              />
+            </div>
+          </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          Resource
-          <input
-            className="h-11 rounded-md border border-slate-300 px-3 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
-            onChange={event => setResourceId(event.target.value)}
-            value={resourceId}
-          />
-        </label>
-        <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          Start
-          <input
-            className="h-11 rounded-md border border-slate-300 px-3 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
-            onChange={event => setStartDateTime(event.target.value)}
-            type="datetime-local"
-            value={startDateTime}
-          />
-        </label>
-        <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          End
-          <input
-            className="h-11 rounded-md border border-slate-300 px-3 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
-            onChange={event => setEndDateTime(event.target.value)}
-            type="datetime-local"
-            value={endDateTime}
-          />
-        </label>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={isBusy}
-          type="submit"
-        >
-          {isBusy ? <Loader2 className="animate-spin" size={17} /> : <CalendarPlus size={17} />}
-          Create
-        </button>
-        {message ? <p className="text-sm font-semibold text-slate-600">{message}</p> : null}
-      </div>
-    </form>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button disabled={isBusy} type="submit" variant="success">
+              {isBusy ? <Loader2 className="animate-spin" size={16} /> : <CalendarPlus size={16} />}
+              Create booking
+            </Button>
+            {message ? (
+              <Alert className="py-2 sm:flex-1" variant={message === "Booking created." ? "default" : "warning"}>
+                <AlertDescription>{message}</AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

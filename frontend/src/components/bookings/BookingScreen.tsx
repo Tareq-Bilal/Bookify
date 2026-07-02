@@ -1,7 +1,11 @@
+import { CalendarClock, Search, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Booking, cancelBooking, getBookingsByResource, getCurrentUserBookings } from "../../api";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 import { Session } from "../../hooks/useSession";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Badge } from "../ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { AppHeader } from "../layout/AppHeader";
 import { BookingFilters, BookingSearchParams } from "./BookingFilters";
 import { BookingForm } from "./BookingForm";
@@ -59,25 +63,40 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950">
       <AppHeader onSignOut={onSignOut} session={session} />
-      <section className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:px-8">
-        <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-          <BookingForm onCreated={refreshLastSearch} session={session} />
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-bold uppercase tracking-wide text-amber-700">Workspace</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-950">Manage shared resource reservations</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Search “Mine” to fetch all bookings owned by the signed-in user across resources, or switch to
-              “Resource” to inspect a shared resource calendar for the selected date range.
-            </p>
+      <section className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+          <Card className="border-slate-200 bg-slate-950 text-white shadow-panel">
+            <CardHeader className="space-y-4">
+              <Badge className="w-fit bg-white/10 text-white hover:bg-white/10" variant="outline">
+                Booking workspace
+              </Badge>
+              <div className="max-w-3xl space-y-3">
+                <CardTitle className="text-3xl font-bold sm:text-4xl">Manage shared resource reservations</CardTitle>
+                <CardDescription className="text-base leading-7 text-slate-300">
+                  Create bookings, review your own reservations across resources, and inspect resource availability in
+                  one focused dashboard.
+                </CardDescription>
+              </div>
+            </CardHeader>
+          </Card>
+
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+            <MetricCard icon={<ShieldCheck size={18} />} label="Access" value="JWT guarded" />
+            <MetricCard icon={<CalendarClock size={18} />} label="Rule" value="[start, end)" />
+            <MetricCard icon={<Search size={18} />} label="Search" value="Mine or resource" />
           </div>
         </div>
 
-        <BookingFilters isBusy={isBusy} onSearch={params => run(() => loadBookings(params))} />
+        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <BookingForm onCreated={refreshLastSearch} session={session} />
+          <BookingFilters isBusy={isBusy} onSearch={params => run(() => loadBookings(params))} />
+        </div>
 
         {message ? (
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-            {message}
-          </p>
+          <Alert variant="warning">
+            <AlertTitle>Workspace update</AlertTitle>
+            <AlertDescription>{message}</AlertDescription>
+          </Alert>
         ) : null}
 
         <BookingsTable
@@ -89,5 +108,19 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
         />
       </section>
     </main>
+  );
+}
+
+function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <Card className="border-slate-200 bg-white/95 shadow-sm">
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className="flex size-10 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">{icon}</div>
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+          <p className="truncate font-semibold text-slate-950">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
