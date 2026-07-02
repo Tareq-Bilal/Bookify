@@ -2,5 +2,7 @@ namespace Application.Abstractions.Data;
 
 public interface IBookingConflictDetector
 {
-    bool IsBookingOverlap(Exception exception);
+    bool IsResourceBookingOverlap(Exception exception);
+
+    bool IsUserBookingOverlap(Exception exception);
 }

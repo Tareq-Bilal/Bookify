@@ -34,17 +34,26 @@ internal sealed class CreateBookingCommandHandler(
         DateTime startDateTime = command.StartDateTime.UtcDateTime;
         DateTime endDateTime = command.EndDateTime.UtcDateTime;
 
-        bool overlapsExistingBooking = await context.Bookings.AsNoTracking()
-            .AnyAsync(
-                b => b.ResourceId == resourceId &&
-                     b.Status == BookingStatus.Confirmed &&
-                     b.StartDateTime < endDateTime &&
-                     startDateTime < b.EndDateTime,
-                cancellationToken);
+        Booking? overlappingUserBooking = await FindOverlappingUserBooking(
+            command.UserId,
+            startDateTime,
+            endDateTime,
+            cancellationToken);
 
-        if (overlapsExistingBooking)
+        if (overlappingUserBooking is not null)
         {
-            return Result.Failure<Guid>(BookingErrors.OverlapsExistingBooking(resourceId));
+            return Result.Failure<Guid>(CreateUserOverlapError(overlappingUserBooking));
+        }
+
+        Booking? overlappingResourceBooking = await FindOverlappingResourceBooking(
+            resourceId,
+            startDateTime,
+            endDateTime,
+            cancellationToken);
+
+        if (overlappingResourceBooking is not null)
+        {
+            return Result.Failure<Guid>(CreateResourceOverlapError(overlappingResourceBooking));
         }
 
         var booking = new Booking
@@ -66,11 +75,67 @@ internal sealed class CreateBookingCommandHandler(
         {
             await context.SaveChangesAsync(cancellationToken);
         }
-        catch (Exception exception) when (bookingConflictDetector.IsBookingOverlap(exception))
+        catch (Exception exception) when (bookingConflictDetector.IsUserBookingOverlap(exception))
         {
-            return Result.Failure<Guid>(BookingErrors.OverlapsExistingBooking(resourceId));
+            Booking? conflictingBooking = await FindOverlappingUserBooking(
+                command.UserId,
+                startDateTime,
+                endDateTime,
+                cancellationToken);
+
+            return Result.Failure<Guid>(
+                conflictingBooking is null
+                    ? BookingErrors.OverlapsExistingUserBooking()
+                    : CreateUserOverlapError(conflictingBooking));
+        }
+        catch (Exception exception) when (bookingConflictDetector.IsResourceBookingOverlap(exception))
+        {
+            Booking? conflictingBooking = await FindOverlappingResourceBooking(
+                resourceId,
+                startDateTime,
+                endDateTime,
+                cancellationToken);
+
+            return Result.Failure<Guid>(
+                conflictingBooking is null
+                    ? BookingErrors.OverlapsExistingBooking(resourceId)
+                    : CreateResourceOverlapError(conflictingBooking));
         }
 
         return booking.Id;
     }
+
+    private async Task<Booking?> FindOverlappingUserBooking(
+        Guid userId,
+        DateTime startDateTime,
+        DateTime endDateTime,
+        CancellationToken cancellationToken) =>
+        await context.Bookings.AsNoTracking()
+            .Where(b => b.UserId == userId &&
+                        b.Status == BookingStatus.Confirmed &&
+                        b.StartDateTime < endDateTime &&
+                        startDateTime < b.EndDateTime)
+            .OrderBy(b => b.StartDateTime)
+            .ThenBy(b => b.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    private async Task<Booking?> FindOverlappingResourceBooking(
+        string resourceId,
+        DateTime startDateTime,
+        DateTime endDateTime,
+        CancellationToken cancellationToken) =>
+        await context.Bookings.AsNoTracking()
+            .Where(b => b.ResourceId == resourceId &&
+                        b.Status == BookingStatus.Confirmed &&
+                        b.StartDateTime < endDateTime &&
+                        startDateTime < b.EndDateTime)
+            .OrderBy(b => b.StartDateTime)
+            .ThenBy(b => b.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    private static Error CreateUserOverlapError(Booking booking) =>
+        BookingErrors.OverlapsExistingUserBooking(booking.ResourceId, booking.StartDateTime, booking.EndDateTime);
+
+    private static Error CreateResourceOverlapError(Booking booking) =>
+        BookingErrors.OverlapsExistingBooking(booking.ResourceId, booking.StartDateTime, booking.EndDateTime);
 }
