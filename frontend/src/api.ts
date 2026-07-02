@@ -156,7 +156,7 @@ function createBookingsQuery({
     fromDateTime: new Date(fromDateTime).toISOString(),
     toDateTime: new Date(toDateTime).toISOString(),
     page: "1",
-    pageSize: "50",
+    pageSize: "100",
     includeCancelled: String(includeCancelled)
   });
 

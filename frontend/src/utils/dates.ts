@@ -21,6 +21,18 @@ export function defaultRangeEnd(): string {
   return toLocalInputValue(new Date(Date.now() + 8 * 60 * 60_000));
 }
 
+export function defaultTodayStart(): string {
+  const today = new Date();
+
+  return toLocalInputValue(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0));
+}
+
+export function defaultTodayEnd(): string {
+  const today = new Date();
+
+  return toLocalInputValue(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59));
+}
+
 export function formatDateTime(value: string): string {
   return new Date(value).toLocaleString();
 }
