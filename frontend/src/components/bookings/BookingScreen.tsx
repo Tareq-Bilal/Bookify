@@ -105,7 +105,7 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
 
   async function handleSearch(params: BookingSearchParams) {
     const resourceId = params.resourceId.trim();
-    const normalizedResourceId = resourceId || (params.mode === "resource" ? "room-a" : "all");
+    const normalizedResourceId = resourceId || (params.mode === "mine" ? "all" : "");
 
     setResourceFilter(params.mode === "mine" ? normalizedResourceId : "all");
 

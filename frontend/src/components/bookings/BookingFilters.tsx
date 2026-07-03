@@ -47,7 +47,7 @@ export function BookingFilters({ isBusy, onSearch }: BookingFiltersProps) {
 
     await onSearch({
       ...filters,
-      resourceId: resourceId || (filters.mode === "resource" ? "room-a" : "all")
+      resourceId: resourceId || (filters.mode === "mine" ? "all" : "")
     });
   }
 
@@ -59,7 +59,7 @@ export function BookingFilters({ isBusy, onSearch }: BookingFiltersProps) {
     setFilters(current => ({
       ...current,
       mode,
-      resourceId: mode === "resource" && current.resourceId === "all" ? "room-a" : current.resourceId
+      resourceId: mode === "resource" && current.resourceId === "all" ? "" : current.resourceId
     }));
   }
 
@@ -97,7 +97,7 @@ export function BookingFilters({ isBusy, onSearch }: BookingFiltersProps) {
             <Input
               id="filterResource"
               onChange={event => updateFilters({ resourceId: event.target.value })}
-              placeholder={filters.mode === "mine" ? "All resources" : "room-a"}
+              placeholder="All resources"
               value={resourceInputValue}
             />
           </div>
