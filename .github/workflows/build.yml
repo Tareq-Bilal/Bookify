@@ -22,13 +22,13 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore CleanArchitecture.slnx
+        run: dotnet restore Bookify.slnx
 
       - name: Build
-        run: dotnet build CleanArchitecture.slnx --configuration Release --no-restore
+        run: dotnet build Bookify.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test CleanArchitecture.slnx --configuration Release --no-restore --no-build
+        run: dotnet test Bookify.slnx --configuration Release --no-restore --no-build
 
       - name: Publish
-        run: dotnet publish CleanArchitecture.slnx --configuration Release --no-restore --no-build
+        run: dotnet publish Bookify.slnx --configuration Release --no-restore --no-build

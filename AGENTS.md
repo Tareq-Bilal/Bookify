@@ -155,7 +155,7 @@ Useful commands:
 dotnet build src/Web.Api/Web.Api.csproj
 dotnet test tests/Application.UnitTests/Application.UnitTests.csproj
 dotnet test tests/IntegrationTests/IntegrationTests.csproj
-dotnet test CleanArchitecture.slnx
+dotnet test Bookify.slnx
 ```
 
 Integration tests require Docker because they use Testcontainers PostgreSQL.
