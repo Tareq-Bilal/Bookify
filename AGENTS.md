@@ -7,7 +7,7 @@ This file is a working reference for future Codex sessions in this repository. U
 Bookify is a .NET 10 pragmatic Clean Architecture API.
 
 - `src/SharedKernel`: common domain primitives such as `Entity`, `IDomainEvent`, `Result`, `Error`, and validation errors.
-- `src/Domain`: domain entities, enums, errors, and domain events. Current domains include `Users` and `Todos`.
+- `src/Domain`: domain entities, enums, errors, and domain events. Current domains include `Users` and `Bookings`.
 - `src/Application`: use cases and application abstractions. This layer owns CQRS contracts, command/query handlers, validators, logging/validation decorators, and interfaces for infrastructure concerns.
 - `src/Infrastructure`: EF Core/PostgreSQL, migrations, authentication, authorization, password hashing, caching, and other concrete services.
 - `src/Web.Api`: Minimal API host, endpoints, Swagger, rate limiting, request logging, exception handling, health checks, and OpenTelemetry wiring.
@@ -71,9 +71,9 @@ Endpoint conventions:
 
 - Keep endpoints thin: map request DTOs to commands/queries and return `result.Match(...)`.
 - Use `CustomResults.Problem` for failures.
-- Add `.WithTags(Tags.Users)` or `.WithTags(Tags.Todos)`.
+- Add `.WithTags(Tags.Users)` or `.WithTags(Tags.Bookings)`.
 - Use `.RequireRateLimiting(RateLimitingPolicies.Authentication)` for unauthenticated auth-like routes such as register, login, refresh token, and credential checks.
-- Use `.RequireAuthorization()` for authenticated user-owned Todo endpoints.
+- Use `.RequireAuthorization()` for authenticated booking endpoints.
 - Use `.HasPermission(Permissions.UsersAccess)` for permission-based user access endpoints.
 - Do not query infrastructure directly from Web.Api when an Application command/query is appropriate.
 

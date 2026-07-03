@@ -116,7 +116,7 @@ flowchart TD
 
 ## Booking Business Logic
 
-Bookings are modeled as a new domain feature beside Users and Todos. A booking has a `ResourceId`, `UserId`, UTC `StartDateTime`, UTC `EndDateTime`, `Status`, and audit timestamps for creation/cancellation. Cancellation is a soft delete: cancelled rows remain queryable when requested, but they no longer block future bookings.
+Bookings are modeled as a domain feature beside Users. A booking has a `ResourceId`, `UserId`, UTC `StartDateTime`, UTC `EndDateTime`, `Status`, and audit timestamps for creation/cancellation. Cancellation is a soft delete: cancelled rows remain queryable when requested, but they no longer block future bookings.
 
 The create-booking flow is:
 
