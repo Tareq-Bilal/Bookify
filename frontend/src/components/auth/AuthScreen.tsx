@@ -1,4 +1,10 @@
-import { CalendarCheck, Loader2, LockKeyhole, LogIn, UserPlus } from "lucide-react";
+import {
+  CalendarCheck,
+  Loader2,
+  LockKeyhole,
+  LogIn,
+  UserPlus,
+} from "lucide-react";
 import { FormEvent, useState } from "react";
 import { getUserId, login, registerUser } from "../../api";
 import { Session } from "../../hooks/useSession";
@@ -18,11 +24,16 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     setMessage("");
 
     try {
-      const userId = action === "register" ? await registerUser(email, password) : await getUserId(email, password);
+      const userId =
+        action === "register"
+          ? await registerUser(email, password)
+          : await getUserId(email, password);
       const tokens = await login(email, password);
       onAuthenticated({ userId, accessToken: tokens.accessToken, email });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Authentication failed.");
+      setMessage(
+        error instanceof Error ? error.message : "Authentication failed.",
+      );
     } finally {
       setIsBusy(false);
     }
@@ -34,8 +45,13 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <section className="mx-auto grid min-h-screen w-full max-w-6xl items-center gap-10 px-4 py-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
+    <main className="relative min-h-screen bg-slate-950 text-slate-100">
+      <div className="absolute left-1/2 top-8 flex -translate-x-1/2 items-center gap-5">
+        <CalendarCheck className="text-emerald-400" size={54} />
+        <span className="text-5xl font-semibold text-white">Bookify</span>
+      </div>
+
+      <section className="mx-auto grid min-h-screen w-full max-w-6xl items-center gap-10 px-4 pb-8 pt-40 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
         <div className="space-y-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm font-semibold text-emerald-100">
             <CalendarCheck size={16} />
@@ -46,23 +62,10 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               Shared resource bookings, guarded by real credentials.
             </h1>
             <p className="text-base leading-7 text-slate-300 sm:text-lg">
-              Sign in to create, review, and cancel bookings. The booking workspace stays unavailable until the API
-              accepts the credentials and returns a JWT.
+              Sign in to create, review, and cancel bookings. The booking
+              workspace stays unavailable until the API accepts the credentials
+              and returns a JWT.
             </p>
-          </div>
-          <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <p className="font-semibold text-white">JWT protected</p>
-              <p className="mt-1">Booking screens require a valid access token.</p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <p className="font-semibold text-white">Conflict aware</p>
-              <p className="mt-1">Overlapping confirmed bookings return a clear conflict.</p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <p className="font-semibold text-white">Responsive</p>
-              <p className="mt-1">The workspace adapts cleanly from mobile to desktop.</p>
-            </div>
           </div>
         </div>
 
@@ -76,7 +79,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             </div>
             <div>
               <h2 className="text-xl font-bold">Access Bookify</h2>
-              <p className="text-sm text-slate-500">Use an existing account or create a demo user.</p>
+              <p className="text-sm text-slate-500">
+                Use an existing account or create a demo user.
+              </p>
             </div>
           </div>
 
@@ -85,7 +90,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               Email
               <input
                 className="h-11 rounded-md border border-slate-300 px-3 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
-                onChange={event => setEmail(event.target.value)}
+                onChange={(event) => setEmail(event.target.value)}
                 type="email"
                 value={email}
               />
@@ -94,7 +99,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               Password
               <input
                 className="h-11 rounded-md border border-slate-300 px-3 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
-                onChange={event => setPassword(event.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 type="password"
                 value={password}
               />
@@ -113,7 +118,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               disabled={isBusy}
               type="submit"
             >
-              {isBusy ? <Loader2 className="animate-spin" size={17} /> : <LogIn size={17} />}
+              {isBusy ? (
+                <Loader2 className="animate-spin" size={17} />
+              ) : (
+                <LogIn size={17} />
+              )}
               Sign in
             </button>
             <button

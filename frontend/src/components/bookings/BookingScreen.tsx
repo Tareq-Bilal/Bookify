@@ -40,6 +40,7 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
   const [totalCount, setTotalCount] = useState(0);
   const [lastSearch, setLastSearch] = useState<BookingSearchParams>(() => createDefaultBookingSearchParams());
   const [pendingCancel, setPendingCancel] = useState<Booking | null>(null);
+  const [resourceFilter, setResourceFilter] = useState("all");
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const { isBusy, message, status, run } = useAsyncAction();
 
@@ -88,6 +89,35 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
     setPendingCancel(booking);
   }
 
+  function handleSortByChange(sortBy: BookingSortBy) {
+    setLastSearch(current => ({ ...current, sortBy }));
+  }
+
+  function handleSortDirectionChange(sortDirection: BookingSortDirection) {
+    setLastSearch(current => ({ ...current, sortDirection }));
+  }
+
+  function handleIncludeCancelledChange(includeCancelled: boolean) {
+    run(async () => {
+      await loadBookings({ ...lastSearch, includeCancelled });
+    });
+  }
+
+  async function handleSearch(params: BookingSearchParams) {
+    const resourceId = params.resourceId.trim();
+    const normalizedResourceId = resourceId || (params.mode === "resource" ? "room-a" : "all");
+
+    setResourceFilter(params.mode === "mine" ? normalizedResourceId : "all");
+
+    await loadBookings({
+      ...params,
+      includeCancelled: lastSearch.includeCancelled,
+      resourceId: normalizedResourceId,
+      sortBy: lastSearch.sortBy,
+      sortDirection: lastSearch.sortDirection
+    });
+  }
+
   function confirmCancel() {
     if (!pendingCancel) {
       return;
@@ -115,9 +145,20 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
     window.setTimeout(() => dismissToast(id), 5000);
   }
 
+  const filteredBookings = useMemo(
+    () => {
+      const normalizedResourceFilter = resourceFilter.trim().toLowerCase();
+
+      return normalizedResourceFilter === "all" || normalizedResourceFilter.length === 0
+        ? bookings
+        : bookings.filter(booking => booking.resourceId.toLowerCase().includes(normalizedResourceFilter));
+    },
+    [bookings, resourceFilter],
+  );
+
   const sortedBookings = useMemo(
-    () => sortBookings(bookings, lastSearch.sortBy, lastSearch.sortDirection),
-    [bookings, lastSearch.sortBy, lastSearch.sortDirection],
+    () => sortBookings(filteredBookings, lastSearch.sortBy, lastSearch.sortDirection),
+    [filteredBookings, lastSearch.sortBy, lastSearch.sortDirection],
   );
 
   return (
@@ -165,15 +206,21 @@ export function BookingScreen({ session, onSignOut }: BookingScreenProps) {
           <BookingForm onCreated={refreshLastSearch} onNotify={pushToast} session={session} />
           <BookingFilters
             isBusy={isBusy}
-            onSearch={(params) => run(() => loadBookings(params))}
+            onSearch={(params) => run(() => handleSearch(params))}
           />
         </div>
 
         <BookingsTable
           bookings={sortedBookings}
           currentUserId={session.userId}
+          includeCancelled={lastSearch.includeCancelled}
           isBusy={isBusy}
           onCancel={handleCancel}
+          onIncludeCancelledChange={handleIncludeCancelledChange}
+          onSortByChange={handleSortByChange}
+          onSortDirectionChange={handleSortDirectionChange}
+          sortBy={lastSearch.sortBy}
+          sortDirection={lastSearch.sortDirection}
           totalCount={totalCount}
         />
       </section>
