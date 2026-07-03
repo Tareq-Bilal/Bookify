@@ -84,6 +84,36 @@ flowchart TB
     WebApi --> Infrastructure
 ```
 
+### Booking Architecture View
+
+This view shows how a resource booking request moves through the application and where each layer takes responsibility.
+
+```mermaid
+flowchart TD
+    UI["React frontend<br/>BookingForm.tsx"]
+    ApiClient["API client<br/>frontend/src/api.ts"]
+    Endpoint["Web.Api<br/>POST /bookings"]
+    Validator["Application<br/>CreateBookingCommandValidator"]
+    Handler["Application<br/>CreateBookingCommandHandler"]
+    Domain["Domain<br/>Booking entity, status, errors, events"]
+    Abstractions["Application abstractions<br/>IApplicationDbContext<br/>IBookingConflictDetector"]
+    Infrastructure["Infrastructure<br/>EF Core + PostgreSQL"]
+    Database[("PostgreSQL<br/>bookings table")]
+    ResourceGuard["ex_bookings_resource_time_range<br/>blocks overlapping confirmed bookings<br/>for the same resource"]
+    UserGuard["ex_bookings_user_time_range<br/>blocks overlapping confirmed bookings<br/>for the same user"]
+
+    UI --> ApiClient
+    ApiClient --> Endpoint
+    Endpoint --> Validator
+    Endpoint --> Handler
+    Handler --> Domain
+    Handler --> Abstractions
+    Abstractions --> Infrastructure
+    Infrastructure --> Database
+    Database --> ResourceGuard
+    Database --> UserGuard
+```
+
 ## Booking Business Logic
 
 Bookings are modeled as a new domain feature beside Users and Todos. A booking has a `ResourceId`, `UserId`, UTC `StartDateTime`, UTC `EndDateTime`, `Status`, and audit timestamps for creation/cancellation. Cancellation is a soft delete: cancelled rows remain queryable when requested, but they no longer block future bookings.
