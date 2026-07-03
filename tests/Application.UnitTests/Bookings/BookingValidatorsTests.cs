@@ -59,6 +59,26 @@ public sealed class BookingValidatorsTests
         result.IsValid.ShouldBeFalse();
     }
 
+    [Fact]
+    public void GetBookingsQueryValidator_Should_NotReturnError_WhenResourceIdIsEmpty()
+    {
+        // Arrange
+        var validator = new GetBookingsQueryValidator();
+        var query = new GetBookingsQuery(
+            string.Empty,
+            new DateTimeOffset(2026, 7, 2, 9, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 7, 2, 17, 0, 0, TimeSpan.Zero),
+            1,
+            50,
+            false);
+
+        // Act
+        ValidationResult result = validator.Validate(query);
+
+        // Assert
+        result.IsValid.ShouldBeTrue();
+    }
+
     private static CreateBookingCommand ValidCreateCommand() =>
         new()
         {

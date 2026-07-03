@@ -13,7 +13,7 @@ internal sealed class Get : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("bookings", async (
-            string resourceId,
+            string? resourceId,
             DateTimeOffset fromDateTime,
             DateTimeOffset toDateTime,
             int? page,
@@ -23,7 +23,7 @@ internal sealed class Get : IEndpoint
             CancellationToken cancellationToken) =>
         {
             var query = new GetBookingsQuery(
-                resourceId,
+                resourceId ?? string.Empty,
                 fromDateTime,
                 toDateTime,
                 page ?? 1,

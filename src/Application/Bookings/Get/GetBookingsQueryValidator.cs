@@ -6,7 +6,7 @@ public sealed class GetBookingsQueryValidator : AbstractValidator<GetBookingsQue
 {
     public GetBookingsQueryValidator()
     {
-        RuleFor(q => q.ResourceId).NotEmpty().MaximumLength(100);
+        RuleFor(q => q.ResourceId).MaximumLength(100);
         RuleFor(q => q.ToDateTime).GreaterThan(q => q.FromDateTime);
         RuleFor(q => q.Page).GreaterThanOrEqualTo(1);
         RuleFor(q => q.PageSize).InclusiveBetween(1, 100);

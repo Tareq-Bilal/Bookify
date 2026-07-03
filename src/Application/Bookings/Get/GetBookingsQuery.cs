@@ -4,7 +4,7 @@ using Application.Abstractions.Pagination;
 namespace Application.Bookings.Get;
 
 public sealed record GetBookingsQuery(
-    string ResourceId,
+    string? ResourceId,
     DateTimeOffset FromDateTime,
     DateTimeOffset ToDateTime,
     int Page,

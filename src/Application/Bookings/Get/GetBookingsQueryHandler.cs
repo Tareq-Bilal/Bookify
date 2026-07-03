@@ -14,15 +14,23 @@ internal sealed class GetBookingsQueryHandler(IApplicationDbContext context)
         GetBookingsQuery query,
         CancellationToken cancellationToken)
     {
-        string resourceId = query.ResourceId.Trim();
+        string resourceId = query.ResourceId?.Trim() ?? string.Empty;
         DateTime fromDateTime = query.FromDateTime.UtcDateTime;
         DateTime toDateTime = query.ToDateTime.UtcDateTime;
 
         IQueryable<Booking> bookingsQuery = context.Bookings
             .AsNoTracking()
-            .Where(b => b.ResourceId == resourceId &&
-                        b.StartDateTime < toDateTime &&
+            .Where(b => b.StartDateTime < toDateTime &&
                         fromDateTime < b.EndDateTime);
+
+        if (resourceId.Length > 0)
+        {
+            string normalizedResourceId = resourceId.ToUpperInvariant();
+
+#pragma warning disable CA1304, CA1311, CA1862 // EF Core translates parameterless ToUpper to SQL UPPER.
+            bookingsQuery = bookingsQuery.Where(b => b.ResourceId.ToUpper() == normalizedResourceId);
+#pragma warning restore CA1304, CA1311, CA1862
+        }
 
         if (!query.IncludeCancelled)
         {
