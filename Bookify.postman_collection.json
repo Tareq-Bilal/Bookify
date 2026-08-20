@@ -1,0 +1,675 @@
+{
+  "info": {
+    "_postman_id": "b00k1fy-c011-4ec7-9a11-000000000001",
+    "name": "Bookify API",
+    "description": "Practice collection for Bookify, built to demo the core ideas from Postman's \"An Introduction to Postman Collections\" video: folders, variables (collection vs environment), collection-level auth with per-folder overrides, pre-request scripts, tests/assertions, and chaining requests together end to end.\n\nRun order (top to bottom, whole collection): Register User -> Login -> Get User By Id -> Create Booking -> Get Bookings -> Get My Bookings -> Cancel Booking.\n\nImport `Bookify.postman_environment.json` and select it before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level pre-request script: runs before EVERY request in this collection.",
+          "console.log(`[Bookify] -> ${pm.request.method} ${pm.request.url}`);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level test script: runs after EVERY request in this collection.",
+          "pm.test('Status code is not a server error', function () {",
+          "    pm.expect(pm.response.code).to.be.below(500);",
+          "});",
+          "",
+          "pm.test('Response time is acceptable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "resourceId", "value": "conference-room-1", "type": "string" },
+    { "key": "fromDateTime", "value": "2020-01-01T00:00:00Z", "type": "string" },
+    { "key": "toDateTime", "value": "2035-01-01T00:00:00Z", "type": "string" },
+    { "key": "userEmail", "value": "", "type": "string" },
+    { "key": "userPassword", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "bookingStart", "value": "", "type": "string" },
+    { "key": "bookingEnd", "value": "", "type": "string" },
+    { "key": "bookingId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "01 - Auth (No Token Required)",
+      "description": "Folder-level auth is overridden to No Auth, which every request below inherits -- shows how auth flows down the tree (Collection Bearer -> Folder override -> Request inherit) and can be changed at any level.",
+      "auth": { "type": "noauth" },
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generates a fresh, unique account each run so re-running the collection never collides with an existing user.",
+                  "const uniqueEmail = `bookify.user.${Date.now()}@example.com`;",
+                  "pm.collectionVariables.set('userEmail', uniqueEmail);",
+                  "pm.collectionVariables.set('userPassword', 'Passw0rd!123');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('User registered (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const newUserId = pm.response.json();",
+                  "pm.collectionVariables.set('userId', newUserId);",
+                  "console.log('Registered user id:', newUserId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "register"]
+            },
+            "description": "Creates a new user. Returns the new user's id (a raw GUID)."
+          },
+          "response": [
+            {
+              "name": "200 OK - User Registered",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"jane.doe@example.com\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"password\": \"Passw0rd!123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/users/register",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "register"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "\"3fa85f64-5717-4562-b3fc-2c963f66afa6\""
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login succeeded (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const tokens = pm.response.json();",
+                  "",
+                  "pm.test('Response has accessToken and refreshToken', function () {",
+                  "    pm.expect(tokens).to.have.property('accessToken');",
+                  "    pm.expect(tokens).to.have.property('refreshToken');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', tokens.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', tokens.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "login"]
+            },
+            "description": "Exchanges credentials for an access token + refresh token. This is the core \"chaining\" step: the test script saves both tokens into collection variables so every later request can use `{{accessToken}}` automatically via the collection's Bearer auth."
+          },
+          "response": [
+            {
+              "name": "200 OK - Login Succeeded",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"jane.doe@example.com\",\n  \"password\": \"Passw0rd!123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/users/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "login"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "{\n  \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-access-token-payload.mock-signature\",\n  \"refreshToken\": \"9c858901-8a57-4791-81fe-4c455b099bc9\"\n}"
+            },
+            {
+              "name": "400 Bad Request - Invalid Credentials",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"jane.doe@example.com\",\n  \"password\": \"wrong-password\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/users/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "login"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/problem+json; charset=utf-8" }],
+              "cookie": [],
+              "body": "{\n  \"type\": \"https://tools.ietf.org/html/rfc9110#section-15.5.1\",\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"The provided credentials were invalid.\",\n  \"errors\": [\n    { \"code\": \"User.InvalidCredentials\", \"description\": \"The provided credentials were invalid\" }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get User Id by Credentials",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returned a user id (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('userId', pm.response.json());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/id",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "id"]
+            },
+            "description": "Alternate way to resolve a user id from credentials, without logging in."
+          },
+          "response": [
+            {
+              "name": "200 OK - User Id Resolved",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"jane.doe@example.com\",\n  \"password\": \"Passw0rd!123\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/users/id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "id"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "\"3fa85f64-5717-4562-b3fc-2c963f66afa6\""
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Token refreshed (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const tokens = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', tokens.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', tokens.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "refresh-token"]
+            },
+            "description": "Trades a refresh token for a fresh access/refresh token pair, and overwrites the chained variables."
+          },
+          "response": [
+            {
+              "name": "200 OK - Token Refreshed",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"9c858901-8a57-4791-81fe-4c455b099bc9\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/users/refresh-token",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "refresh-token"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "{\n  \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-refreshed-token-payload.mock-signature\",\n  \"refreshToken\": \"7d6b3d2a-1f4e-4a3b-9c2d-5e6f7a8b9c0d\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Users (Requires Token)",
+      "description": "No auth is set on these requests -- they inherit the collection's Bearer {{accessToken}} auth automatically.",
+      "item": [
+        {
+          "name": "Get User By Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Fetched user (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const user = pm.response.json();",
+                  "pm.test('User email matches registered email', function () {",
+                  "    pm.expect(user.email).to.eql(pm.collectionVariables.get('userEmail'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            },
+            "description": "Requires the `users:access` permission -- uses the inherited Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK - User Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/users/3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "{\n  \"id\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n  \"email\": \"jane.doe@example.com\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Bookings (Requires Token)",
+      "description": "No auth is set on these requests -- they inherit the collection's Bearer {{accessToken}} auth automatically.",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Folder-level test script: runs after every request in this folder, in addition to the collection-level one.",
+              "pm.test('Bookings endpoint responded with an expected status', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 204, 400, 404]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Create Booking",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Computes a booking window relative to \"now\" (tomorrow, 2-hour slot) so it's always valid.",
+                  "const start = new Date();",
+                  "start.setUTCDate(start.getUTCDate() + 1);",
+                  "const end = new Date(start);",
+                  "end.setUTCHours(end.getUTCHours() + 2);",
+                  "",
+                  "pm.collectionVariables.set('bookingStart', start.toISOString());",
+                  "pm.collectionVariables.set('bookingEnd', end.toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Booking created (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const newBookingId = pm.response.json();",
+                  "pm.collectionVariables.set('bookingId', newBookingId);",
+                  "console.log('Created booking id:', newBookingId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resourceId\": \"{{resourceId}}\",\n  \"userId\": \"{{userId}}\",\n  \"startDateTime\": \"{{bookingStart}}\",\n  \"endDateTime\": \"{{bookingEnd}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings"]
+            },
+            "description": "Creates a booking for `{{resourceId}}` on behalf of `{{userId}}`. Chains into Cancel Booking via `{{bookingId}}`."
+          },
+          "response": [
+            {
+              "name": "200 OK - Booking Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"resourceId\": \"conference-room-1\",\n  \"userId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n  \"startDateTime\": \"2026-08-21T09:00:00Z\",\n  \"endDateTime\": \"2026-08-21T11:00:00Z\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/bookings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "\"6b1f6f2a-9d3b-4a5b-9c3d-abcdef123456\""
+            }
+          ]
+        },
+        {
+          "name": "Get Bookings (filtered)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('List retrieved (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const page = pm.response.json();",
+                  "pm.test('Response is a paged list', function () {",
+                  "    pm.expect(page).to.have.property('items');",
+                  "    pm.expect(page).to.have.property('totalCount');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/bookings?resourceId={{resourceId}}&fromDateTime={{fromDateTime}}&toDateTime={{toDateTime}}&page=1&pageSize=50&includeCancelled=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings"],
+              "query": [
+                { "key": "resourceId", "value": "{{resourceId}}" },
+                { "key": "fromDateTime", "value": "{{fromDateTime}}" },
+                { "key": "toDateTime", "value": "{{toDateTime}}" },
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "50" },
+                { "key": "includeCancelled", "value": "false" }
+              ]
+            },
+            "description": "Lists bookings for a resource within a date range. Good spot to demo query-param variables."
+          },
+          "response": [
+            {
+              "name": "200 OK - Bookings Page",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/bookings?resourceId=conference-room-1&fromDateTime=2020-01-01T00:00:00Z&toDateTime=2035-01-01T00:00:00Z&page=1&pageSize=50&includeCancelled=false",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings"],
+                  "query": [
+                    { "key": "resourceId", "value": "conference-room-1" },
+                    { "key": "fromDateTime", "value": "2020-01-01T00:00:00Z" },
+                    { "key": "toDateTime", "value": "2035-01-01T00:00:00Z" },
+                    { "key": "page", "value": "1" },
+                    { "key": "pageSize", "value": "50" },
+                    { "key": "includeCancelled", "value": "false" }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"6b1f6f2a-9d3b-4a5b-9c3d-abcdef123456\",\n      \"resourceId\": \"conference-room-1\",\n      \"userId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n      \"startDateTime\": \"2026-08-21T09:00:00Z\",\n      \"endDateTime\": \"2026-08-21T11:00:00Z\",\n      \"status\": 0,\n      \"createdAt\": \"2026-08-20T10:00:00Z\",\n      \"cancelledAt\": null\n    }\n  ],\n  \"page\": 1,\n  \"pageSize\": 50,\n  \"totalCount\": 1\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get My Bookings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('List retrieved (200 OK)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/me?fromDateTime={{fromDateTime}}&toDateTime={{toDateTime}}&page=1&pageSize=50&includeCancelled=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", "me"],
+              "query": [
+                { "key": "fromDateTime", "value": "{{fromDateTime}}" },
+                { "key": "toDateTime", "value": "{{toDateTime}}" },
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "50" },
+                { "key": "includeCancelled", "value": "false" }
+              ]
+            },
+            "description": "Lists bookings for the currently authenticated user (resolved from the Bearer token)."
+          },
+          "response": [
+            {
+              "name": "200 OK - My Bookings Page",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/bookings/me?fromDateTime=2020-01-01T00:00:00Z&toDateTime=2035-01-01T00:00:00Z&page=1&pageSize=50&includeCancelled=false",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings", "me"],
+                  "query": [
+                    { "key": "fromDateTime", "value": "2020-01-01T00:00:00Z" },
+                    { "key": "toDateTime", "value": "2035-01-01T00:00:00Z" },
+                    { "key": "page", "value": "1" },
+                    { "key": "pageSize", "value": "50" },
+                    { "key": "includeCancelled", "value": "false" }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+              "cookie": [],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"6b1f6f2a-9d3b-4a5b-9c3d-abcdef123456\",\n      \"resourceId\": \"conference-room-1\",\n      \"userId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n      \"startDateTime\": \"2026-08-21T09:00:00Z\",\n      \"endDateTime\": \"2026-08-21T11:00:00Z\",\n      \"status\": 0,\n      \"createdAt\": \"2026-08-20T10:00:00Z\",\n      \"cancelledAt\": null\n    }\n  ],\n  \"page\": 1,\n  \"pageSize\": 50,\n  \"totalCount\": 1\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Booking cancelled (204 No Content)', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/{{bookingId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", "{{bookingId}}", "cancel"]
+            },
+            "description": "Cancels the booking created above, using the chained `{{bookingId}}` variable."
+          },
+          "response": [
+            {
+              "name": "204 No Content - Booking Cancelled",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/bookings/6b1f6f2a-9d3b-4a5b-9c3d-abcdef123456/cancel",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings", "6b1f6f2a-9d3b-4a5b-9c3d-abcdef123456", "cancel"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "header": [],
+              "cookie": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

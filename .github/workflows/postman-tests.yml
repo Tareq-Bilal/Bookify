@@ -1,0 +1,102 @@
+name: Postman Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  newman-mock:
+    name: Contract tests (mock server)
+    runs-on: ubuntu-latest
+    if: ${{ vars.POSTMAN_MOCK_BASE_URL != '' }}
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Newman
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Run collection against mock server
+        run: |
+          newman run Bookify.postman_collection.json \
+            -e Bookify.postman_environment.json \
+            --env-var "baseUrl=${{ vars.POSTMAN_MOCK_BASE_URL }}" \
+            --folder "01 - Auth (No Token Required)" \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export newman/mock-report.html
+
+      - name: Upload mock report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-mock-report
+          path: newman/mock-report.html
+
+  newman-integration:
+    name: Integration tests (real API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Newman
+        run: npm install -g newman newman-reporter-htmlextra
+
+      - name: Start Bookify API + Postgres
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build postgres web-api
+
+      - name: Wait for API health check
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/health > /dev/null; then
+              echo "API is healthy"
+              exit 0
+            fi
+            echo "Waiting for API... ($i/30)"
+            sleep 3
+          done
+          echo "API did not become healthy in time"
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs web-api
+          exit 1
+
+      - name: Run Postman collection (Newman)
+        run: |
+          newman run Bookify.postman_collection.json \
+            -e Bookify.postman_environment.json \
+            --reporters cli,junit,htmlextra \
+            --reporter-junit-export newman/report.xml \
+            --reporter-htmlextra-export newman/report.html
+
+      - name: Upload Newman reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-integration-report
+          path: newman/
+
+      - name: Publish test summary
+        if: always()
+        continue-on-error: true
+        uses: dorny/test-reporter@v1
+        with:
+          name: Newman results
+          path: newman/report.xml
+          reporter: java-junit
+
+      - name: Tear down containers
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v

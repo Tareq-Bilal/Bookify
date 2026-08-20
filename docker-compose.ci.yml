@@ -1,0 +1,8 @@
+services:
+  web-api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - "ConnectionStrings__Database=Host=postgres;Port=5432;Database=clean-architecture;Username=postgres;Password=postgres;Include Error Detail=true"
+    ports:
+      - "5000:8080"
